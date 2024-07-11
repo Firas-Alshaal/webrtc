@@ -52,7 +52,15 @@ const (
 	Candidate Method = "candidate"
 	Leave     Method = "leave"
 	Keepalive Method = "keepalive"
+	TrackStatus Method = "trackStatus"
 )
+
+type TrackStatusRequest struct {
+	SessionID string `json:"sessionId"`
+	TrackType string `json:"trackType"`
+	Enabled   bool   `json:"enabled"`
+	MyId   string   `json:"myId"`
+}
 
 type Request struct {
 	Type Method      `json:"type"`
@@ -305,6 +313,67 @@ func (s *Signaler) HandleNewWebSocket(conn *websocket.WebSocketConn, request *ht
 
 		case Keepalive:
 			s.Send(conn, request)
+		case TrackStatus:
+			{
+				// Unmarshal TrackStatus data
+				var trackStatus TrackStatusRequest
+				err := json.Unmarshal(body, &trackStatus)
+				if err != nil {
+					logger.Errorf("Unmarshal TrackStatus got error %v", err)
+					return
+				}
+
+				// Get the session ID and track status details
+				sessionId := trackStatus.SessionID
+				trackType := trackStatus.TrackType
+				enabled := trackStatus.Enabled
+				myId := trackStatus.MyId
+
+				// Split the session ID into two components
+				ids := strings.Split(sessionId, "-")
+				if len(ids) != 2 {
+					// Handle invalid session ID
+					msg := Request{
+						Type: "error",
+						Data: Error{
+							Request: string(request.Type),
+							Reason:  "Invalid session [" + sessionId + "]",
+						},
+					}
+					s.Send(conn, msg)
+					return
+				}
+
+				// Iterate over peers to find a match for the session ID component
+				for _, peer := range s.peers {
+					// Check if the peer ID matches either component of the session ID
+					if peer.info.ID == ids[0] || peer.info.ID == ids[1] {
+						// Peer ID matches session ID component, send track status message
+						message := Request{
+							Type: "trackStatus",
+							Data: map[string]interface{}{
+								"trackType": trackType,
+								"enabled":   enabled,
+								"sessionId": sessionId,
+								"myId": myId,
+							},
+						}
+						s.Send(peer.conn, message)
+					} else {
+						msg := Request{
+							Type: "error",
+							Data: Error{
+								Request: string(request.Type),
+								Reason:  "Session not found [" + sessionId + "]",
+							},
+						}
+						s.Send(conn, msg)
+						return
+					}
+				}
+
+
+			}
 		default:
 			logger.Warnf("Unkown request %v", request)
 		}
