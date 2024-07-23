@@ -26,5 +26,5 @@ go.work.sum
 
 # firebase 
 serviceAccountKey.json
-
+AuthKey_B695C9HCAN.p8
 configs/certs/
