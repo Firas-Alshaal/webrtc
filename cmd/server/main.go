@@ -166,6 +166,18 @@ func main() {
 	}
 
 	http.HandleFunc("/send-message", func(w http.ResponseWriter, r *http.Request) {
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+
 		// Parse JSON request body
 		var message Message
 		errMessage := json.NewDecoder(r.Body).Decode(&message)
@@ -322,6 +334,20 @@ func main() {
 	})
 
 	http.HandleFunc("/cancel-message", func(w http.ResponseWriter, r *http.Request) {
+
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+
+
 		var cancelMessage CancelMessage
 		err := json.NewDecoder(r.Body).Decode(&cancelMessage)
 		if err != nil {
@@ -352,6 +378,20 @@ func main() {
 
 
 	http.HandleFunc("/decline-call", func(w http.ResponseWriter, r *http.Request) {
+
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+
+
 		var declineMessage DeclineMessage
 		err := json.NewDecoder(r.Body).Decode(&declineMessage)
 		if err != nil {
