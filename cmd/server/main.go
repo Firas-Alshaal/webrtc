@@ -1,23 +1,24 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/flutter-webrtc/flutter-webrtc-server/pkg/signaler"
 	"github.com/flutter-webrtc/flutter-webrtc-server/pkg/turn"
 	"github.com/flutter-webrtc/flutter-webrtc-server/pkg/websocket"
 	"gopkg.in/ini.v1"
-	"context"
-	"encoding/json"
-	"log"
-	"fmt"
-	"net/http"
-    // "github.com/google/uuid"
+
+	// "github.com/google/uuid"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/token"
 	"google.golang.org/api/option"
-
 )
 
 // User represents the user data
@@ -30,49 +31,50 @@ type User struct {
 
 // Message represents the message data
 type Message struct {
-	UUID        string `json:"uuid"`
-	Id        string `json:"id"`
-	CallerID    string `json:"caller_id"`
-	CallerName  string `json:"caller_name"`
-	CallerIDType string `json:"caller_id_type"`
-	HasVideo    bool `json:"has_video"`
-	RoomID      string `json:"room_id"`
-	FCMToken    string `json:"fcm_token"`
-	SenderFCMToken    string `json:"sender_fcm_token"`
+	UUID           string `json:"uuid"`
+	Id             string `json:"id"`
+	CallerID       string `json:"caller_id"`
+	CallerName     string `json:"caller_name"`
+	CallerIDType   string `json:"caller_id_type"`
+	HasVideo       bool   `json:"has_video"`
+	RoomID         string `json:"room_id"`
+	FCMToken       string `json:"fcm_token"`
+	SenderFCMToken string `json:"sender_fcm_token"`
 	VoIPToken      string `json:"voip_token"`
 }
 
 type CancelMessage struct {
-	UUID string `json:"uuid"`
-	FCMToken       string `json:"fcm_token"`
-	Id       string `json:"id"`
+	UUID      string `json:"uuid"`
+	FCMToken  string `json:"fcm_token"`
+	Id        string `json:"id"`
+	VoIPToken string `json:"voip_token"`
 }
 
 type DeclineMessage struct {
-	UUID     string `json:"uuid"`
-	FCMToken string `json:"fcm_token"`
+	UUID      string `json:"uuid"`
+	FCMToken  string `json:"fcm_token"`
+	VoIPToken string `json:"voip_token"`
 }
 
-
 type IncomingPayload struct {
-	Extra                 ExtraData           `json:"extra"`
-	NameCaller            string              `json:"nameCaller"`
-	AppName               string              `json:"appName"`
-	Type                  int                 `json:"type"`
-	IOS                   IOSData             `json:"ios"`
-	Handle                string              `json:"handle"`
-	Duration              int                 `json:"duration"`
-	Avatar                string              `json:"avatar"`
-	UUID                  string              `json:"uuid"`
-	ID                    string              `json:"id"`
-	Android               AndroidData         `json:"android"`
-	MissedCallNotification MissedCallNotif    `json:"missedCallNotification"`
-	NormalHandle          interface{}         `json:"normalHandle"`
-	TextDecline           string              `json:"textDecline"`
+	Extra                  ExtraData       `json:"extra"`
+	NameCaller             string          `json:"nameCaller"`
+	AppName                string          `json:"appName"`
+	Type                   int             `json:"type"`
+	IOS                    IOSData         `json:"ios"`
+	Handle                 string          `json:"handle"`
+	Duration               int             `json:"duration"`
+	Avatar                 string          `json:"avatar"`
+	UUID                   string          `json:"uuid"`
+	ID                     string          `json:"id"`
+	Android                AndroidData     `json:"android"`
+	MissedCallNotification MissedCallNotif `json:"missedCallNotification"`
+	NormalHandle           interface{}     `json:"normalHandle"`
+	TextDecline            string          `json:"textDecline"`
 }
 
 type ExtraData struct {
-	HasVideo       string   `json:"has_video"`
+	HasVideo       string `json:"has_video"`
 	UserID         string `json:"userId"`
 	SenderFCMToken string `json:"sender_fcm_token"`
 	UUID           string `json:"uuid"`
@@ -98,27 +100,27 @@ type IOSData struct {
 }
 
 type AndroidData struct {
-	IsShowFullLockedScreen           interface{} `json:"isShowFullLockedScreen"`
-	RingtonePath                     string      `json:"ringtonePath"`
-	BackgroundColor                  string      `json:"backgroundColor"`
-	BackgroundUrl                    string      `json:"backgroundUrl"`
-	TextColor                        string      `json:"textColor"`
-	ActionColor                      string      `json:"actionColor"`
-	MissedCallNotificationChannelName interface{} `json:"missedCallNotificationChannelName"`
-	IsCustomSmallExNotification      interface{} `json:"isCustomSmallExNotification"`
+	IsShowFullLockedScreen              interface{} `json:"isShowFullLockedScreen"`
+	RingtonePath                        string      `json:"ringtonePath"`
+	BackgroundColor                     string      `json:"backgroundColor"`
+	BackgroundUrl                       string      `json:"backgroundUrl"`
+	TextColor                           string      `json:"textColor"`
+	ActionColor                         string      `json:"actionColor"`
+	MissedCallNotificationChannelName   interface{} `json:"missedCallNotificationChannelName"`
+	IsCustomSmallExNotification         interface{} `json:"isCustomSmallExNotification"`
 	IncomingCallNotificationChannelName interface{} `json:"incomingCallNotificationChannelName"`
-	IsCustomNotification             int         `json:"isCustomNotification"`
-	IsShowLogo                       int         `json:"isShowLogo"`
-	IsShowCallID                     interface{} `json:"isShowCallID"`
+	IsCustomNotification                int         `json:"isCustomNotification"`
+	IsShowLogo                          int         `json:"isShowLogo"`
+	IsShowCallID                        interface{} `json:"isShowCallID"`
 }
 
 type MissedCallNotif struct {
-	ID             interface{} `json:"id"`
+	ID               interface{} `json:"id"`
 	ShowNotification int         `json:"showNotification"`
-	Count          interface{} `json:"count"`
-	Subtitle       string      `json:"subtitle"`
-	CallbackText   string      `json:"callbackText"`
-	IsShowCallback int         `json:"isShowCallback"`
+	Count            interface{} `json:"count"`
+	Subtitle         string      `json:"subtitle"`
+	CallbackText     string      `json:"callbackText"`
+	IsShowCallback   int         `json:"isShowCallback"`
 }
 
 type CustomTransport struct {
@@ -135,8 +137,8 @@ func (t *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func main() {
-	
-	opt := option.WithCredentialsFile("/Users/atlas/flutter-webrtc-server/serviceAccountKey.json")
+
+	opt := option.WithCredentialsFile("serviceAccountKey.json")
 	configFirebase := &firebase.Config{ProjectID: "bubbly-shield-408505"}
 
 	app, err := firebase.NewApp(context.Background(), configFirebase, opt)
@@ -144,21 +146,19 @@ func main() {
 		log.Fatalf("error initializing app: %v", err)
 	}
 
-
-	authKey, err := token.AuthKeyFromFile("/Users/atlas/flutter-webrtc-server/AuthKey_B695C9HCAN.p8")
-    if err != nil {
-        log.Fatalf("AuthKey error: %v", err)
-    }
+	authKey, err := token.AuthKeyFromFile("AuthKey_B695C9HCAN.p8")
+	if err != nil {
+		log.Fatalf("AuthKey error: %v", err)
+	}
 
 	apnsToken := &token.Token{
-		AuthKey:   authKey,
-		KeyID:     "B695C9HCAN",
-		TeamID:    "87U75J6869",
+		AuthKey: authKey,
+		KeyID:   "B695C9HCAN",
+		TeamID:  "87U75J6869",
 	}
-	
+
 	clientVoip := apns2.NewTokenClient(apnsToken).Development() // Use .Production() for production
 	clientVoip.HTTPClient.Transport = &CustomTransport{RoundTripper: clientVoip.HTTPClient.Transport}
-
 
 	client, err := app.Messaging(context.Background())
 	if err != nil {
@@ -176,7 +176,6 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
 
 		// Parse JSON request body
 		var message Message
@@ -199,7 +198,6 @@ func main() {
 		// }
 
 		// uuid := uuid.New().String()
-
 
 		payload := fmt.Sprintf(`{
 			"extra": {
@@ -261,80 +259,78 @@ func main() {
 			"textAccept": "Accept"
 		  }`, message.CallerID, message.SenderFCMToken, message.UUID, message.CallerName, message.Id, message.Id)
 
+		var incomingData IncomingPayload
+		err := json.Unmarshal([]byte(payload), &incomingData)
+		if err != nil {
+			log.Fatalf("Error parsing JSON: %v", err)
+		}
 
-		  var incomingData IncomingPayload
-		  err := json.Unmarshal([]byte(payload), &incomingData)
-		  if err != nil {
-			  log.Fatalf("Error parsing JSON: %v", err)
-		  }
-
-		  if message.VoIPToken != "" {
+		if message.VoIPToken != "" {
 			notification := &apns2.Notification{
 				Topic: "com.atlascrisis.webeoc.voip",
 				Payload: map[string]interface{}{
-						"extra": incomingData.Extra,
-						"nameCaller": incomingData.NameCaller,
-						"appName": incomingData.AppName,
-						"type": incomingData.Type,
-						"ios": incomingData.IOS,
-						"handle": incomingData.Handle,
-						"duration": incomingData.Duration,
-						"avatar": incomingData.Avatar,
-						"uuid": incomingData.UUID,
-						"id": incomingData.UUID,
-						"android": incomingData.Android,
-						"missedCallNotification": incomingData.MissedCallNotification,
-						"normalHandle": incomingData.NormalHandle,
-						"textDecline": incomingData.TextDecline,
+					"extra":                  incomingData.Extra,
+					"nameCaller":             incomingData.NameCaller,
+					"appName":                incomingData.AppName,
+					"type":                   incomingData.Type,
+					"ios":                    incomingData.IOS,
+					"handle":                 incomingData.Handle,
+					"duration":               incomingData.Duration,
+					"avatar":                 incomingData.Avatar,
+					"uuid":                   incomingData.UUID,
+					"id":                     incomingData.UUID,
+					"android":                incomingData.Android,
+					"missedCallNotification": incomingData.MissedCallNotification,
+					"normalHandle":           incomingData.NormalHandle,
+					"textDecline":            incomingData.TextDecline,
 				},
 				DeviceToken: message.VoIPToken,
-				PushType: 	apns2.PushTypeBackground,
+				PushType:    apns2.PushTypeBackground,
 			}
-	
+
 			res, err := clientVoip.Push(notification)
-			if err!= nil {
+			if err != nil {
 				log.Printf("Error sending VoIP notification: %v", err)
 				http.Error(w, "Error sending VoIP notification", http.StatusInternalServerError)
 				return
 			}
-	
+
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(res)
 			fmt.Println(res)
 		} else {
-				// Create a new FCM message
-				msg := &messaging.Message{
-					Data: map[string]string{
-						"uuid":          message.UUID,
-						"caller_id":     message.CallerID,
-						"caller_name":   message.CallerName,
-						"caller_id_type": message.CallerIDType,
-						"has_video":     fmt.Sprintf("%t", message.HasVideo),
-						"room_id":       message.RoomID,
-						"sender_fcm_token":       message.SenderFCMToken,
-						"id":       message.Id,
-					},
-					Token: message.FCMToken,
-				}
+			// Create a new FCM message
+			msg := &messaging.Message{
+				Data: map[string]string{
+					"uuid":             message.UUID,
+					"caller_id":        message.CallerID,
+					"caller_name":      message.CallerName,
+					"caller_id_type":   message.CallerIDType,
+					"has_video":        fmt.Sprintf("%t", message.HasVideo),
+					"room_id":          message.RoomID,
+					"sender_fcm_token": message.SenderFCMToken,
+					"id":               message.Id,
+				},
+				Token: message.FCMToken,
+			}
 
-				// Send the message
-				response, errMessage := client.Send(context.Background(), msg)
-				if errMessage != nil {
-					log.Printf("error sending message: %v\n", errMessage)
-					http.Error(w, "Error sending message", http.StatusInternalServerError)
-					return
-				}
+			// Send the message
+			response, errMessage := client.Send(context.Background(), msg)
+			if errMessage != nil {
+				log.Printf("error sending message: %v\n", errMessage)
+				http.Error(w, "Error sending message", http.StatusInternalServerError)
+				return
+			}
 
-				// Write response
-				w.WriteHeader(http.StatusOK)
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+			// Write response
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
 		}
 	})
 
 	http.HandleFunc("/cancel-message", func(w http.ResponseWriter, r *http.Request) {
-
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -345,8 +341,6 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
-
 
 		var cancelMessage CancelMessage
 		err := json.NewDecoder(r.Body).Decode(&cancelMessage)
@@ -355,30 +349,52 @@ func main() {
 			return
 		}
 
-		msg := &messaging.Message{
-			Data: map[string]string{
-				"type":            "cancel_call",
-				"uuid": cancelMessage.UUID,
-				"id": cancelMessage.Id,
-			},
-			Token: cancelMessage.FCMToken,
-		}
+		if cancelMessage.VoIPToken != "" {
+			notification := &apns2.Notification{
+				Topic: "com.atlascrisis.webeoc.voip",
+				Payload: map[string]interface{}{
+					"type": "cancel_call",
+					"uuid": cancelMessage.UUID,
+					"id":   cancelMessage.Id,
+				},
+				DeviceToken: cancelMessage.VoIPToken,
+				PushType:    apns2.PushTypeBackground,
+			}
 
-		response, err := client.Send(context.Background(), msg)
-		if err != nil {
-			log.Printf("error sending cancel message: %v\n", err)
-			http.Error(w, "Error sending cancel message", http.StatusInternalServerError)
-			return
-		}
+			res, err := clientVoip.Push(notification)
+			if err != nil {
+				log.Printf("Error sending VoIP notification: %v", err)
+				http.Error(w, "Error sending VoIP notification", http.StatusInternalServerError)
+				return
+			}
 
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(res)
+		} else {
+			msg := &messaging.Message{
+				Data: map[string]string{
+					"type": "cancel_call",
+					"uuid": cancelMessage.UUID,
+					"id":   cancelMessage.Id,
+				},
+				Token: cancelMessage.FCMToken,
+			}
+
+			response, err := client.Send(context.Background(), msg)
+			if err != nil {
+				log.Printf("error sending cancel message: %v\n", err)
+				http.Error(w, "Error sending cancel message", http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+		}
 	})
 
-
 	http.HandleFunc("/decline-call", func(w http.ResponseWriter, r *http.Request) {
-
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -389,8 +405,6 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
-
 
 		var declineMessage DeclineMessage
 		err := json.NewDecoder(r.Body).Decode(&declineMessage)
@@ -419,7 +433,6 @@ func main() {
 		json.NewEncoder(w).Encode(response)
 	})
 
-	
 	cfg, err := ini.Load("configs/config.ini")
 
 	publicIP := cfg.Section("turn").Key("public_ip").String()

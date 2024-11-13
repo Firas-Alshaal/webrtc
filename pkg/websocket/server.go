@@ -1,8 +1,12 @@
 package websocket
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"log"
 	"net/http"
-	"strconv"
+	"os"
 
 	"github.com/flutter-webrtc/flutter-webrtc-server/pkg/logger"
 	"github.com/gorilla/websocket"
@@ -72,7 +76,34 @@ func (server *WebSocketServer) Bind(cfg WebSocketServerConfig) {
 	http.HandleFunc(cfg.WebSocketPath, server.handleWebSocketRequest)
 	http.HandleFunc(cfg.TurnServerPath, server.handleTurnServerRequest)
 	http.Handle("/", http.FileServer(http.Dir(cfg.HTMLRoot)))
+
+	// Read the server certificate and key
+	sslCert := cfg.CertFile // Path to your .crt file
+	sslKey := cfg.KeyFile   // Path to your .key file
+
+	// Read the CA certificate if you want to trust your self-signed cert
+	caCert, err := os.ReadFile("configs/rtccerts/webrtc.pem")
+	if err != nil {
+		log.Fatalf("Failed to read CA certificate: %v", err)
+	}
+
+	// Create a CertPool and add your custom CA
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCert)
+
+	// Create a custom TLS configuration to skip verification
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,     // Skip SSL certificate verification
+		RootCAs:            certPool, // Add the custom CA (if using self-signed cert)
+	}
+
+	// Create a custom HTTP server with TLS
+	serverTLS := &http.Server{
+		Addr:      fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		TLSConfig: tlsConfig,
+	}
+
 	logger.Infof("Flutter WebRTC Server listening on: %s:%d", cfg.Host, cfg.Port)
 	// http.ListenAndServe(cfg.Host+":"+strconv.Itoa(cfg.Port), nil)
-	panic(http.ListenAndServeTLS(cfg.Host+":"+strconv.Itoa(cfg.Port), cfg.CertFile, cfg.KeyFile, nil))
+	panic(serverTLS.ListenAndServeTLS(sslCert, sslKey))
 }
